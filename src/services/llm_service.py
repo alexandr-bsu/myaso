@@ -12,6 +12,7 @@ import os
 os.environ["LANGFUSE_PUBLIC_KEY"] = settings.langfuse.langfuse_public_key
 os.environ["LANGFUSE_SECRET_KEY"] = settings.langfuse.langfuse_secret_key
 os.environ["LANGFUSE_HOST"] = settings.langfuse.langfuse_host
+os.environ["OPENAI_API_KEY"] = settings.openrouter.openrouter_api_key
 
 
 supabase_client = create_client(
