@@ -1,18 +1,20 @@
+import os
+from src.config.settings import settings
+
+# Set environment variables before importing OpenAI and Mirascope
+os.environ["LANGFUSE_PUBLIC_KEY"] = settings.langfuse.langfuse_public_key
+os.environ["LANGFUSE_SECRET_KEY"] = settings.langfuse.langfuse_secret_key
+os.environ["LANGFUSE_HOST"] = settings.langfuse.langfuse_host
+os.environ["OPENAI_API_KEY"] = settings.openrouter.openrouter_api_key
+
 from openai import OpenAI
 from mirascope.core import openai, BaseMessageParam, BaseDynamicConfig, Messages, BaseTool
-from src.config.settings import settings
 from mirascope.integrations.langfuse import with_langfuse
 from supabase import create_client, Client, ClientOptions
 from typing import List, Optional, Dict, Any
 from pydantic import Field
 import requests
 import json
-
-import os
-os.environ["LANGFUSE_PUBLIC_KEY"] = settings.langfuse.langfuse_public_key
-os.environ["LANGFUSE_SECRET_KEY"] = settings.langfuse.langfuse_secret_key
-os.environ["LANGFUSE_HOST"] = settings.langfuse.langfuse_host
-os.environ["OPENAI_API_KEY"] = settings.openrouter.openrouter_api_key
 
 
 supabase_client = create_client(
@@ -69,8 +71,14 @@ class ShowProductPhotos(BaseTool):
 
 class LLMService:
     def __init__(self):
+        print(f"API Key loaded: {settings.openrouter.openrouter_api_key[:10]}...")
+        print(f"Base URL: {settings.openrouter.base_url}")
+        print(f"Model ID: {settings.openrouter.model_id}")
+        
         self.client: OpenAI = OpenAI(
-            api_key=settings.openrouter.openrouter_api_key, base_url=settings.openrouter.base_url)
+            api_key=settings.openrouter.openrouter_api_key, 
+            base_url=settings.openrouter.base_url
+        )
         # Initialize Supabase client
         self.supabase: Client = create_client(
             settings.supabase.supabase_url,
