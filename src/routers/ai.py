@@ -166,6 +166,7 @@ async def ask(request: LLMRequest) -> Dict[str, Any]:
             order_service = await OrderService()
             orders = await order_service.get_all_orders_by_client_phone(client_phone=request.client_phone)
             products = await order_service.get_all_products()
+            price_history = await order_service.get_all_price_history()
 
             # Handle the case where system_instructions might not be a dict
             if isinstance(system_instructions, dict):
@@ -177,6 +178,8 @@ async def ask(request: LLMRequest) -> Dict[str, Any]:
             Профиль клиента: {profile}
             ===============================================
             Предыдущие заказы клиента: {orders}
+            ===============================================
+            История изменения цен на продукцию: {price_history}
             ===============================================
             Доступный ассортимент для заказа: {products}
             ===============================================
