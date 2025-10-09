@@ -166,6 +166,7 @@ async def ask(request: LLMRequest) -> Dict[str, Any]:
             order_service = await OrderService()
             orders = await order_service.get_all_orders_by_client_phone(client_phone=request.client_phone)
             products = await order_service.get_all_products()
+            sys_variables = await order_service.get_sys_variables
 
             # Handle the case where system_instructions might not be a dict
             if isinstance(system_instructions, dict):
@@ -175,6 +176,8 @@ async def ask(request: LLMRequest) -> Dict[str, Any]:
                 
             full_prompt = f"""
             Профиль клиента: {profile}
+            ===============================================
+            Системные переменные: {sys_variables}
             ===============================================
             Предыдущие заказы клиента: {orders}
             ===============================================
