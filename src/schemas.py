@@ -19,6 +19,7 @@ class ConversationHistoryMessage(BaseModel):
 
 class InitConverastionRequest(BaseModel):
     client_phone: str
+    topic: str = Field(default="Продать")
 
 
 class DirectMessageRequest(BaseModel):
@@ -30,6 +31,7 @@ class UserMessageRequest(InitConverastionRequest):
 
 class LLMRequest(BaseModel):
     prompt: Optional[str] = None
+    topic: Optional[str] = None
     client_phone: str
     
     @field_validator('prompt', mode='before')

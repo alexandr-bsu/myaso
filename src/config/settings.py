@@ -9,7 +9,8 @@ class SupabaseSettings(BaseSettings):
     model_config = SettingsConfigDict(env_file='.env', env_file_encoding='utf-8', extra='ignore')
 
 class OpenRouterSettings(BaseSettings):
-    base_url: str = "https://dashscope-intl.aliyuncs.com/compatible-mode/v1"
+    # base_url: str = "https://dashscope-intl.aliyuncs.com/compatible-mode/v1"
+    base_url: str = "https://openrouter.ai/api/v1"
     openrouter_api_key: str
     model_id: str
     model_config = SettingsConfigDict(env_file='.env', env_file_encoding='utf-8', extra='ignore')
