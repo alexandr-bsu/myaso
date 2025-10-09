@@ -22,4 +22,5 @@ class OrderService(AsyncMixin):
     async def get_sys_variables(self):
         result = await self.supabase.table('system').select('*').execute()
         return result.data if len(result.data) else []
-        
+
+

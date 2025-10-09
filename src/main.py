@@ -16,4 +16,8 @@ app.add_middleware(
 
 app.include_router(ai.router)
 
+@app.get("/health", status_code=200)
+def read_root():
+    return {"status": "healthy"}
+
 
