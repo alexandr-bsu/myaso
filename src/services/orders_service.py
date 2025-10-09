@@ -18,8 +18,3 @@ class OrderService(AsyncMixin):
     async def get_all_orders_by_client_phone(self, client_phone: str):
         result = await self.supabase.table('orders').select('*').eq('client_phone', client_phone).execute()
         return result.data if len(result.data) else []
-
-    async def get_all_price_history(self):
-        result = await self.supabase.table('suppliers').select('*').execute()
-        return result.data if len(result.data) else []
-    
