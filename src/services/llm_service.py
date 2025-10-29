@@ -178,7 +178,7 @@ class LLMService:
             model=settings.openrouter.model_id,
             client=self.client,
             tools=[ShowProductPhotos],
-            call_params={"reasoning_effort": "medium", "max_tokens": 1800 * 3},
+            call_params={"reasoning_effort": "medium"},
         )
         def _call(messages: List[BaseMessageParam]):
             return messages
