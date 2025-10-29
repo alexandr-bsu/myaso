@@ -531,7 +531,7 @@ Foreign key relations: None
         for product in products:
             print(product)
             print()
-            text_description = f"""Товар {product['title']} из {product['from_region']} поставщиком которого - компания {product['supplier_name']}, является {product['cooled_or_frozen']} продуктом. Упаковывается в {product['product_in_package']}. {"Готовый к употреблению продукт" if product['ready_made'] else "Требует предварительного приготовления"}"""
+            text_description = f"""Товар {product['title']} из {product['from_region']} поставщиком которого - компания {product['supplier_name']}, является {product['cooled_or_frozen']} продуктом. Упаковывается в {product['package_type']}. Фасовка продукта {product['product_in_package']}. {"Товар является полуфабрикатом" if product['ready_made'] else "Товар не является полуфабрикатом"}. Скидка на товар - {product['discount']}"""
             print()
             print(text_description)
             print()

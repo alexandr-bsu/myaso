@@ -3,13 +3,13 @@ from uvicorn import run
 
 run(app)
 
-# from src.services.orders_service import OrderService
+# from src.services.llm_service import LLMService
 # import asyncio
 
 
 # async def main():
-    # orders = OrderService()
-    # embedder = llm_service.embedder
+#     llm_service = LLMService()
+#     embedder = llm_service.embedder
 
     # completion = embedder.embeddings.create(model="text-embedding-v4", input="Что у вас есть из продукции корал?")
 
@@ -23,4 +23,4 @@ run(app)
 
 
 # if __name__ == "__main__":
-    # asyncio.run(main())
+#     asyncio.run(main())
