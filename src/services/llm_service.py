@@ -247,10 +247,10 @@ class LLMService:
             for i, error in enumerate(errors, 1):
                 error_context += f"Error {i}:\n"
                 if error.sql_query:
-                    error_context += f"  Failed SQL: {error.sql_query}\n"
+                    error_context += f"- Failed SQL: {error.sql_query}\n"
                 if error.db_error:
-                    error_context += f"  Database Error: {error.db_error}\n"
-                error_context += f"  Issue: {error.message}\n\n"
+                    error_context += f"- Database Error: {error.db_error}\n"
+                error_context += f"- Issue: {error.message}\n\n"
             error_context += "Please fix these issues in your new SQL query.\n"
 
         # Prepare messages
