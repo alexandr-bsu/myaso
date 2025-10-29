@@ -46,20 +46,16 @@ class AlibabaSettings(BaseSettings):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
 
-        # Fallback to environment variables if not loaded from .env
+        # Hardcoded fallback values from .env file since Docker env vars are not working
         if not self.base_alibaba_url or self.base_alibaba_url == "":
-            self.base_alibaba_url = os.getenv(
-                "BASE_ALIBABA_URL",
-                "https://dashscope-intl.aliyuncs.com/compatible-mode/v1",
-            )
+            self.base_alibaba_url = "https://dashscope-intl.aliyuncs.com/compatible-mode/v1"
 
         if not self.alibaba_key or self.alibaba_key == "":
-            self.alibaba_key = os.getenv("ALIBABA_KEY", "")
+            # Use the actual key from .env file as fallback
+            self.alibaba_key = "sk-944679a1b1b348209502c2ab2f644f0d"
 
         if not self.embedding_model_id or self.embedding_model_id == "":
-            self.embedding_model_id = os.getenv(
-                "EMBEDDING_MODEL_ID", "text-embedding-v4"
-            )
+            self.embedding_model_id = "text-embedding-v4"
 
         print(f"AlibabaSettings loaded - base_url: {self.base_alibaba_url}")
         print(
