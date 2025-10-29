@@ -5,7 +5,6 @@ from src.config.settings import settings
 from supabase import acreate_client, AClient, AsyncClientOptions
 from typing import Optional
 from src.utils import AsyncMixin, records_to_json
-from src.services.llm_service import LLMService
 from openai import OpenAI
 
 class OrderService(AsyncMixin):
@@ -32,12 +31,10 @@ class OrderService(AsyncMixin):
 
     async def find_products_by_query(self, query: str):
         print('find_products_by_query started')
-        llm_service = LLMService()
         conn = await asyncpg.connect(
                     dsn='postgres://postgres.your-tenant-id:N,$=~94SJRuWBU"h5kH;.2@51.250.35.208:5432/postgres'
                 )
-        embedder = llm_service.embedder
-        completion = embedder.embeddings.create(model="text-embedding-v4", input=query)
+        completion = self.embedder.embeddings.create(model="text-embedding-v4", input=query)
         query_vector = completion.model_dump()['data'][0]['embedding']
         sql_request = f"""
         SELECT *
