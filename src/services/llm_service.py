@@ -1,8 +1,8 @@
 import os
 import asyncpg
 from src.config.settings import settings
-# from mirascope.retries.tenacity import collect_errors
-# from tenacity import retry, stop_after_attempt
+from mirascope.retries.tenacity import collect_errors
+from tenacity import retry, stop_after_attempt
 
 
 # Set environment variables before importing OpenAI and Mirascope
@@ -29,6 +29,35 @@ import json
 
 from src.services.history_service import HistoryService
 from src.utils import parse_sql_result, records_to_json
+
+
+class SQLError(Exception):
+    """Custom exception for SQL-related errors"""
+
+    def __init__(self, message: str, sql_query: str = None, db_error: str = None):
+        self.message = message
+        self.sql_query = sql_query
+        self.db_error = db_error
+        super().__init__(message)
+
+
+def collect_sql_errors(error_type):
+    """
+    Custom error collector for SQL errors, similar to Mirascope's collect_errors
+    """
+
+    def after_callback(retry_state):
+        if retry_state.outcome and retry_state.outcome.failed:
+            exception = retry_state.outcome.exception()
+            if isinstance(exception, error_type):
+                # Get the errors list from kwargs, or create a new one
+                errors = retry_state.kwargs.get("errors", [])
+                errors.append(exception)
+                retry_state.kwargs["errors"] = errors
+        return retry_state
+
+    return after_callback
+
 
 supabase_client = create_client(
     settings.supabase.supabase_url,
@@ -185,19 +214,35 @@ class LLMService:
 
         return response
 
-    async def get_sql_query(self, user_request: str, top_k_limit: int = None, client: dict = None):
-        
+    async def get_sql_query(
+        self,
+        user_request: str,
+        top_k_limit: int = None,
+        client: dict = None,
+        errors: list[SQLError] = None,
+    ):
+
         @with_langfuse()
         @openai.call(
             model=settings.openrouter.model_id,
             client=self.client,
             call_params={"reasoning_effort": "medium"},
         )
-        def _call(messages: List[BaseMessageParam],
-        #  errors: list[ValidationError] | None = None
-        ):
-
+        def _call(messages: List[BaseMessageParam]):
             return messages
+
+        # Build error context if errors exist
+        error_context = ""
+        if errors:
+            error_context = "\n\nPREVIOUS ERRORS TO AVOID:\n"
+            for i, error in enumerate(errors, 1):
+                error_context += f"Error {i}:\n"
+                if error.sql_query:
+                    error_context += f"  Failed SQL: {error.sql_query}\n"
+                if error.db_error:
+                    error_context += f"  Database Error: {error.db_error}\n"
+                error_context += f"  Issue: {error.message}\n\n"
+            error_context += "Please fix these issues in your new SQL query.\n"
 
         # Prepare messages
         messages: list[BaseMessageParam] = [
@@ -304,6 +349,7 @@ Foreign key relations: None
 
 --------------------------------------------------------------------------------------------------
 
+{error_context}
 """
             ),
             Messages.User(
@@ -316,52 +362,106 @@ Foreign key relations: None
         response = _call(messages)
         return response
 
-    
-    async def get_result_from_db_by_ai(self, user_request: str, top_k_limit: int = None, client: dict = None):
-        response = await self.get_sql_query(user_request, top_k_limit, client)
-
-        # Extract content from response
-        content = ""
+    @retry(stop=stop_after_attempt(3), after=collect_sql_errors(SQLError))
+    async def get_result_from_db_by_ai(
+        self,
+        user_request: str,
+        top_k_limit: int = None,
+        client: dict = None,
+        errors: list[SQLError] = None,
+    ):
+        """
+        Get SQL query result with automatic retry and error feedback loop.
+        If SQL generation or execution fails, the error is collected and passed to the next attempt.
+        """
         try:
+            # Generate SQL query with error context from previous attempts
+            response = await self.get_sql_query(
+                user_request, top_k_limit, client, errors
+            )
 
-            response_attr = getattr(response, 'response', None)
-            if response_attr is not None:
-
-                choices_attr = getattr(response_attr, 'choices', None)
-                if choices_attr is not None:
-                    content = choices_attr[0].message.content
+            # Extract content from response
+            content = ""
+            try:
+                response_attr = getattr(response, "response", None)
+                if response_attr is not None:
+                    choices_attr = getattr(response_attr, "choices", None)
+                    if choices_attr is not None:
+                        content = choices_attr[0].message.content
+                    else:
+                        content = str(response_attr)
                 else:
-                    content = str(response_attr)
-            else:
-                choices_attr = getattr(response, 'choices', None)
-                if choices_attr is not None:
-                    content = choices_attr[0].message.content
-                else:
-                    content = str(response)
+                    choices_attr = getattr(response, "choices", None)
+                    if choices_attr is not None:
+                        content = choices_attr[0].message.content
+                    else:
+                        content = str(response)
+            except Exception as e:
+                content = f"Error extracting content: {str(e)}"
 
+            # Parse SQL from response
+            try:
+                sql_request = parse_sql_result(content)
+            except ValueError as e:
+                raise SQLError(
+                    message=f"Failed to parse SQL from AI response: {str(e)}",
+                    sql_query=None,
+                    db_error=None,
+                )
+
+            # Security check for dangerous operations
+            if (
+                "insert" in sql_request.lower()
+                or "update" in sql_request.lower()
+                or "delete" in sql_request.lower()
+            ):
+                raise SQLError(
+                    message="AI attempted to generate dangerous SQL operation (INSERT/UPDATE/DELETE)",
+                    sql_query=sql_request,
+                    db_error=None,
+                )
+
+            print(f"Generated SQL: {sql_request}")
+
+            # Execute SQL query
+            conn = None
+            try:
+                conn = await asyncpg.connect(
+                    dsn='postgres://postgres.your-tenant-id:N,$=~94SJRuWBU"h5kH;.2@51.250.35.208:5432/postgres'
+                )
+                result = await conn.fetch(sql_request)
+
+                print(f"Query result: {result}")
+
+                # Convert Record objects to JSON-compatible dictionaries
+                json_result = records_to_json(result)
+
+                print(f"JSON result: {json_result}")
+
+                return json_result
+
+            except Exception as db_error:
+                # Database execution error - create SQLError with context
+                error_message = str(db_error)
+
+                
+                raise SQLError(
+                    message=f"{error_message}",
+                    sql_query=sql_request,
+                    db_error=error_message,
+                )
+            finally:
+                if conn:
+                    await conn.close()
+
+        except SQLError:
+            # Re-raise SQLError as-is for retry mechanism
+            raise
         except Exception as e:
-            content = f"Error extracting content: {str(e)}"
-    
-        sql_request = parse_sql_result(content)
-        if ('insert' in sql_request.lower() or 'update' in sql_request.lower() or 'delete' in sql_request.lower()):
-            raise ValueError("AI table modification attempt detected")
+            # Convert any other exception to SQLError
+            raise SQLError(
+                message=f"Unexpected error: {str(e)}", sql_query=None, db_error=str(e)
+            )
 
-        print(sql_request)
-
-        conn = await asyncpg.connect(dsn='postgres://postgres.your-tenant-id:N,$=~94SJRuWBU"h5kH;.2@51.250.35.208:5432/postgres')
-        result = await conn.fetch(sql_request)
-
-        print(result)
-       
-        # Преобразуем Record объекты в JSON-совместимые словари
-        json_result = records_to_json(result)
-    
-        print(json_result)
-        await conn.close()
-
-        return json_result
 
 llm = LLMService()
-
-
-    
