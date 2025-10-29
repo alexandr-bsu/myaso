@@ -145,8 +145,11 @@ class LLMService:
             base_url=settings.openrouter.base_url,
         )
 
-        print(f"LLMService - Alibaba API Key: {settings.alibaba.alibaba_key[:10]}...")
+        print(f"LLMService - Alibaba API Key: {settings.alibaba.alibaba_key[:10] if settings.alibaba.alibaba_key else 'EMPTY'}...")
         print(f"LLMService - Alibaba Base URL: {settings.alibaba.base_alibaba_url}")
+        
+        if not settings.alibaba.alibaba_key or not settings.alibaba.base_alibaba_url:
+            raise ValueError(f"Alibaba settings are not properly configured. API Key: {'SET' if settings.alibaba.alibaba_key else 'EMPTY'}, Base URL: {settings.alibaba.base_alibaba_url}")
         
         self.embedder: OpenAI = OpenAI(
             api_key=settings.alibaba.alibaba_key,
