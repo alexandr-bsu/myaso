@@ -144,6 +144,12 @@ class LLMService:
             api_key=settings.openrouter.openrouter_api_key,
             base_url=settings.openrouter.base_url,
         )
+
+        self.embedder: OpenAI = OpenAI(
+            api_key=settings.alibaba.alibaba_key,
+            base_url=settings.alibaba.base_alibaba_url
+        )
+
         # Initialize Supabase client
         self.supabase: Client = create_client(
             settings.supabase.supabase_url, settings.supabase.supabase_service_key
@@ -500,6 +506,25 @@ Foreign key relations: None
             raise SQLError(
                 message=f"Unexpected error: {str(e)}", sql_query=None, db_error=str(e)
             )
+
+    async def embedd_products(self):
+        products = (
+                supabase_client.table("products")
+                .select("*")
+                .execute()
+            ).data
+
+        for product in products:
+            print(product)
+            print()
+            text_description = f"""Товар {product['title']} из {product['from_region']} поставщиком которого - компания {product['supplier_name']}, является {product['cooled_or_frozen']} продуктом. Упаковывается в {product['product_in_package']}. {"Готовый к употреблению продукт" if product['ready_made'] else "Требует предварительного приготовления"}"""  
+            print()
+            print(text_description)
+            print()
+            completion = self.embedder.embeddings.create(model="text-embedding-v4", input=text_description)
+            vector = completion.model_dump()['data'][0]['embedding']
+            supabase_client.table("products").upsert({**product, "embedding": vector}).execute()
+    
 
 
 llm = LLMService()
