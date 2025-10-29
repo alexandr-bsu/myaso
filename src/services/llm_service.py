@@ -482,9 +482,10 @@ Foreign key relations: None
                 json_result = records_to_json(result)
 
                 print(f"JSON result: {json_result}")
-
-                for product in json_result:
-                    del product['embedding']
+                
+                if json_result:
+                    for product in json_result:
+                        del product['embedding']
 
                 return json_result
 
