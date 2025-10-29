@@ -483,6 +483,9 @@ Foreign key relations: None
 
                 print(f"JSON result: {json_result}")
 
+                for product in json_result:
+                    del product['embedding']
+
                 return json_result
 
             except Exception as db_error:
