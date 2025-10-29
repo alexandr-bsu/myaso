@@ -12,6 +12,9 @@ class OrderService(AsyncMixin):
         self.supabase: AClient = await acreate_client(
             settings.supabase.supabase_url, settings.supabase.supabase_service_key, options=AsyncClientOptions(schema='myaso'))
 
+        print(f"OrderService - Alibaba API Key: {settings.alibaba.alibaba_key[:10]}...")
+        print(f"OrderService - Alibaba Base URL: {settings.alibaba.base_alibaba_url}")
+        
         self.embedder: OpenAI = OpenAI(
             api_key=settings.alibaba.alibaba_key,
             base_url=settings.alibaba.base_alibaba_url
@@ -31,6 +34,9 @@ class OrderService(AsyncMixin):
 
     async def find_products_by_query(self, query: str):
         print('find_products_by_query started')
+        print(f"Embedder base_url: {self.embedder.base_url}")
+        print(f"Embedder api_key: {self.embedder.api_key[:10]}...")
+        
         conn = await asyncpg.connect(
                     dsn='postgres://postgres.your-tenant-id:N,$=~94SJRuWBU"h5kH;.2@51.250.35.208:5432/postgres'
                 )

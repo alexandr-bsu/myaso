@@ -145,6 +145,9 @@ class LLMService:
             base_url=settings.openrouter.base_url,
         )
 
+        print(f"LLMService - Alibaba API Key: {settings.alibaba.alibaba_key[:10]}...")
+        print(f"LLMService - Alibaba Base URL: {settings.alibaba.base_alibaba_url}")
+        
         self.embedder: OpenAI = OpenAI(
             api_key=settings.alibaba.alibaba_key,
             base_url=settings.alibaba.base_alibaba_url
