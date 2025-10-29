@@ -330,7 +330,6 @@ from_region: type - text, required - false - Product's region of origin
 photo: type - text, required - false - Product photo's link
 pricelist_date: type - date, required - false - Price at pricelist date
 supplier_name: type - text, required - false - Supplier name
-delivery_cost_MSK: type - float8, required - false - Delivery cost to Moscow for 1 kg of product
 package_weight: type - float8, required - false - Weight of one product package
 prepayment_1t: type - int8, required - false 
 order_price_kg: type - float8, required - false - Price of one kilogram of the product  
