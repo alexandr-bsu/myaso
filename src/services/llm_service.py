@@ -145,16 +145,18 @@ class LLMService:
             base_url=settings.openrouter.base_url,
         )
 
-        print(f"LLMService - Alibaba API Key: {settings.alibaba.alibaba_key[:10] if settings.alibaba.alibaba_key else 'EMPTY'}...")
+        print(
+            f"LLMService - Alibaba API Key: {settings.alibaba.alibaba_key[:10] if settings.alibaba.alibaba_key else 'EMPTY'}..."
+        )
         print(f"LLMService - Alibaba Base URL: {settings.alibaba.base_alibaba_url}")
-        
+
         # Temporarily disable validation to allow startup
         # if not settings.alibaba.alibaba_key or not settings.alibaba.base_alibaba_url:
         #     raise ValueError(f"Alibaba settings are not properly configured. API Key: {'SET' if settings.alibaba.alibaba_key else 'EMPTY'}, Base URL: {settings.alibaba.base_alibaba_url}")
-        
+
         self.embedder: OpenAI = OpenAI(
             api_key=settings.alibaba.alibaba_key,
-            base_url=settings.alibaba.base_alibaba_url
+            base_url=settings.alibaba.base_alibaba_url,
         )
 
         # Initialize Supabase client
@@ -278,7 +280,7 @@ return the most interesting examples in the database.
 
 
 {f'CLIENT INFO: {client}' if client is not None else ''}
-{f'SYSTEM VARIABLES: {system_vars}' if system_vars is not None else ''}
+{f'SYSTEM VARIABLES: {system_vars if system_vars else "No system variables available"}' if system_vars is not None else ''}
 
 Guidelines:
 - ALWAYS USE SCHEMA "myaso" IN EACH QUERY. TABLES ARE NOT IN PUBLIC 
@@ -390,6 +392,7 @@ Foreign key relations: None
         user_request: str,
         top_k_limit: int = None,
         client: dict = None,
+        system_vars: dict = None,
         errors: list[SQLError] = None,
     ):
         """
@@ -401,6 +404,7 @@ Foreign key relations: None
                 user_request=user_request,
                 top_k_limit=top_k_limit,
                 client=client,
+                system_vars=system_vars,
                 errors=errors or [],
             )
         except RetryError as e:
@@ -415,6 +419,7 @@ Foreign key relations: None
         user_request: str,
         top_k_limit: int = None,
         client: dict = None,
+        system_vars: dict = None,
         errors: list[SQLError] = None,
     ):
         """
@@ -431,7 +436,7 @@ Foreign key relations: None
 
             # Generate SQL query with error context from previous attempts
             response = await self.get_sql_query(
-                user_request, top_k_limit, client, current_errors
+                user_request, top_k_limit, client, system_vars, current_errors
             )
 
             # Extract content from response
@@ -491,10 +496,10 @@ Foreign key relations: None
                 json_result = records_to_json(result)
 
                 print(f"JSON result: {json_result}")
-                
+
                 if json_result:
                     for product in json_result:
-                        del product['embedding']
+                        del product["embedding"]
 
                 return json_result
 
@@ -521,23 +526,22 @@ Foreign key relations: None
             )
 
     async def embedd_products(self):
-        products = (
-                supabase_client.table("products")
-                .select("*")
-                .execute()
-            ).data
+        products = (supabase_client.table("products").select("*").execute()).data
 
         for product in products:
             print(product)
             print()
-            text_description = f"""Товар {product['title']} из {product['from_region']} поставщиком которого - компания {product['supplier_name']}, является {product['cooled_or_frozen']} продуктом. Упаковывается в {product['product_in_package']}. {"Готовый к употреблению продукт" if product['ready_made'] else "Требует предварительного приготовления"}"""  
+            text_description = f"""Товар {product['title']} из {product['from_region']} поставщиком которого - компания {product['supplier_name']}, является {product['cooled_or_frozen']} продуктом. Упаковывается в {product['product_in_package']}. {"Готовый к употреблению продукт" if product['ready_made'] else "Требует предварительного приготовления"}"""
             print()
             print(text_description)
             print()
-            completion = self.embedder.embeddings.create(model="text-embedding-v4", input=text_description)
-            vector = completion.model_dump()['data'][0]['embedding']
-            supabase_client.table("products").upsert({**product, "embedding": vector}).execute()
-    
+            completion = self.embedder.embeddings.create(
+                model="text-embedding-v4", input=text_description
+            )
+            vector = completion.model_dump()["data"][0]["embedding"]
+            supabase_client.table("products").upsert(
+                {**product, "embedding": vector}
+            ).execute()
 
 
 llm = LLMService()
