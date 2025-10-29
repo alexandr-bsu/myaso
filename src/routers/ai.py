@@ -148,6 +148,7 @@ async def get_profile(request: Profile):
 
 async def ask(request: LLMRequest) -> Dict[str, Any]:
     history_service = await HistoryService()
+
     message_history = await transorm_history_to_llm_format(
         await history_service.get_history(client_phone=request.client_phone)
     )
@@ -166,6 +167,13 @@ async def ask(request: LLMRequest) -> Dict[str, Any]:
             products = await order_service.get_all_products()
             sys_variables = await order_service.get_sys_variables()
 
+
+            products = await llm.get_result_from_db_by_ai(
+                user_request= (await history_service.get_instructions(topic="Получить товары при инициализации диалога")).get('prompt', ''),
+                top_k_limit=10,
+                client=profile
+            )
+
             # Handle the case where system_instructions might not be a dict
             if isinstance(system_instructions, dict):
                 prompt_content = system_instructions.get('prompt', '') if system_instructions else ''
@@ -179,7 +187,7 @@ async def ask(request: LLMRequest) -> Dict[str, Any]:
             ===============================================
             Предыдущие заказы клиента: {orders}
             ===============================================
-            Подходящие товары: 
+            Подходящие товары: {products}
             ===============================================
             {prompt_content}
             """

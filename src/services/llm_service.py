@@ -1,8 +1,7 @@
 import os
 import asyncpg
 from src.config.settings import settings
-from mirascope.retries.tenacity import collect_errors
-from tenacity import retry, stop_after_attempt
+from tenacity import retry, stop_after_attempt, RetryError
 
 
 # Set environment variables before importing OpenAI and Mirascope
@@ -219,7 +218,7 @@ class LLMService:
         user_request: str,
         top_k_limit: int = None,
         client: dict = None,
-        errors: list[SQLError] = None,
+        errors: list[SQLError] = [],
     ):
 
         @with_langfuse()
@@ -300,7 +299,7 @@ Description: The orders table tracks product orders placed by clients, linking e
 
 id: type - UUID, primary - true
 title: type - text, required - true - The ordered product's title
-phone: type - text, required - true - Client's phone number. This client ordered the product
+client_phone: type - text, required - true - Client's phone number. This client ordered the product
 created_at: type - date, required - true - Order date
 weight_kg: type - int, required - true - Product weight in the order
 price_out: type - text, required - true - Order price
@@ -308,7 +307,7 @@ destination: type - text, required - true - Order delivery destination
 price_out_kg: type - text, required - true - Product price (for one kilogram)
 
 Foreign key relation to: myaso.clients
-orders_phone_fkey: phone -> myaso.clients.phone
+orders_client_phone_fkey: client_phone -> myaso.clients.phone
 
 --------------------------------------------------------------------------------------------------
 
@@ -362,7 +361,6 @@ Foreign key relations: None
         response = _call(messages)
         return response
 
-    @retry(stop=stop_after_attempt(3), after=collect_sql_errors(SQLError))
     async def get_result_from_db_by_ai(
         self,
         user_request: str,
@@ -372,6 +370,26 @@ Foreign key relations: None
     ):
         """
         Get SQL query result with automatic retry and error feedback loop.
+        Returns {} if all retry attempts fail.
+        """
+        try:
+            return await self._get_result_from_db_by_ai_with_retry(
+                user_request, top_k_limit, client, errors
+            )
+        except RetryError:
+            print("All retry attempts failed, returning empty dict")
+            return []
+
+    @retry(stop=stop_after_attempt(3), after=collect_sql_errors(SQLError))
+    async def _get_result_from_db_by_ai_with_retry(
+        self,
+        user_request: str,
+        top_k_limit: int = None,
+        client: dict = None,
+        errors: list[SQLError] = None,
+    ):
+        """
+        Internal method with retry logic.
         If SQL generation or execution fails, the error is collected and passed to the next attempt.
         """
         try:
@@ -444,7 +462,6 @@ Foreign key relations: None
                 # Database execution error - create SQLError with context
                 error_message = str(db_error)
 
-                
                 raise SQLError(
                     message=f"{error_message}",
                     sql_query=sql_request,
