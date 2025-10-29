@@ -46,13 +46,23 @@ def collect_sql_errors(error_type):
     """
 
     def after_callback(retry_state):
+        print(f"Retry attempt {retry_state.attempt_number} completed")
+
         if retry_state.outcome and retry_state.outcome.failed:
             exception = retry_state.outcome.exception()
+            print(
+                f"Attempt failed with exception: {type(exception).__name__}: {exception}"
+            )
+
             if isinstance(exception, error_type):
                 # Get the errors list from kwargs, or create a new one
                 errors = retry_state.kwargs.get("errors", [])
                 errors.append(exception)
                 retry_state.kwargs["errors"] = errors
+                print(f"Added error to list, total errors: {len(errors)}")
+        else:
+            print("Attempt succeeded")
+
         return retry_state
 
     return after_callback
@@ -374,10 +384,15 @@ Foreign key relations: None
         """
         try:
             return await self._get_result_from_db_by_ai_with_retry(
-                user_request, top_k_limit, client, errors
+                user_request=user_request,
+                top_k_limit=top_k_limit,
+                client=client,
+                errors=errors or [],
             )
-        except RetryError:
-            print("All retry attempts failed, returning empty dict")
+        except RetryError as e:
+            print(
+                f"All retry attempts failed after {e.last_attempt.attempt_number} attempts, returning empty dict"
+            )
             return []
 
     @retry(stop=stop_after_attempt(3), after=collect_sql_errors(SQLError))
@@ -393,9 +408,16 @@ Foreign key relations: None
         If SQL generation or execution fails, the error is collected and passed to the next attempt.
         """
         try:
+            # Get errors from retry state if available (from previous attempts)
+            current_errors = errors or []
+
+            print(
+                f"Starting SQL query attempt with {len(current_errors)} previous errors"
+            )
+
             # Generate SQL query with error context from previous attempts
             response = await self.get_sql_query(
-                user_request, top_k_limit, client, errors
+                user_request, top_k_limit, client, current_errors
             )
 
             # Extract content from response
