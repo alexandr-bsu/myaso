@@ -279,6 +279,7 @@ async def ask(request: LLMRequest) -> Dict[str, Any]:
                 ).get("prompt", ""),
                 top_k_limit=10,
                 client=profile,
+                system_vars=sys_variables
             )
 
             # Handle the case where system_instructions might not be a dict

@@ -241,6 +241,7 @@ class LLMService:
         user_request: str,
         top_k_limit: int = None,
         client: dict = None,
+        system_vars: dict = None,
         errors: list[SQLError] = [],
     ):
 
@@ -277,6 +278,7 @@ return the most interesting examples in the database.
 
 
 {f'CLIENT INFO: {client}' if client is not None else ''}
+{f'SYSTEM VARIABLES: {system_vars}' if system_vars is not None else ''}
 
 Guidelines:
 - ALWAYS USE SCHEMA "myaso" IN EACH QUERY. TABLES ARE NOT IN PUBLIC 
