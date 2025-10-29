@@ -54,17 +54,17 @@ async def init_conversation_background(request: InitConverastionRequest):
        
         # TODO: Перевести контент в формат whatsapp
         # print('ai_response init_conversation_background', remove_markdown_symbols(ai_response['content']))
-        requests.post('http://51.250.42.45:2026/send-message', json={'recipient': request.client_phone, 'message': remove_markdown_symbols(ai_response['content'])})
-        # return {'content': remove_markdown_symbols(ai_response['content'])}
-        return {'succes': True}
+        # requests.post('http://51.250.42.45:2026/send-message', json={'recipient': request.client_phone, 'message': remove_markdown_symbols(ai_response['content'])})
+        return {'content': remove_markdown_symbols(ai_response['content'])}
+        # return {'succes': True}
 
     except Exception as e:
-        requests.post('http://51.250.42.45:2026/send-message', json={'recipient': request.client_phone, 'message': 'Произошла ошибка при обработке вашего сообщения. Попробуйте позже.'})
+        # requests.post('http://51.250.42.45:2026/send-message', json={'recipient': request.client_phone, 'message': 'Произошла ошибка при обработке вашего сообщения. Попробуйте позже.'})
         print(f'ERROR in init_conversation_background: {e}')
         import traceback
         traceback.print_exc()
-        return {'succes': False}
-        # return {'content': 'Произошла ошибка при обработке вашего сообщения. Попробуйте позже.'}
+        # return {'succes': False}
+        return {'content': 'Произошла ошибка при обработке вашего сообщения. Попробуйте позже.'}
 
 
 async def process_conversation_background(request: UserMessageRequest):
@@ -101,17 +101,17 @@ async def process_conversation_background(request: UserMessageRequest):
 
         # TODO: Перевести контент в формат whatsapp
         # print('ai_response process_conversation_background', remove_markdown_symbols(ai_response['content']))
-        requests.post('http://51.250.42.45:2026/send-message', json={'recipient': request.client_phone, 'message': remove_markdown_symbols(ai_response['content'])})
-        return {'succes': True}
-        # return {'content': remove_markdown_symbols(ai_response['content'])}
+        # requests.post('http://51.250.42.45:2026/send-message', json={'recipient': request.client_phone, 'message': remove_markdown_symbols(ai_response['content'])})
+        # return {'succes': True}
+        return {'content': remove_markdown_symbols(ai_response['content'])}
 
     except Exception as e:
-        requests.post('http://51.250.42.45:2026/send-message', json={'recipient': request.client_phone, 'message': 'Произошла ошибка при обработке вашего сообщения. Попробуйте позже.'})
+        # requests.post('http://51.250.42.45:2026/send-message', json={'recipient': request.client_phone, 'message': 'Произошла ошибка при обработке вашего сообщения. Попробуйте позже.'})
         print(f'ERROR in process_conversation_background: {e}')
         import traceback
         traceback.print_exc()
-        return {'succes': False}
-        # return {'content': 'Произошла ошибка при обработке вашего сообщения. Попробуйте позже.'}
+        # return {'succes': False}
+        return {'content': 'Произошла ошибка при обработке вашего сообщения. Попробуйте позже.'}
 
 
 # TODO: Сделать сброс истории и инициализировать новый диалог (ktopравить сообщение клиенту)
@@ -129,16 +129,16 @@ async def reset_conversation(request: ResetConversationRequest, background_tasks
 
 @router.post('/initConversation', status_code=200)
 async def init_conversation(request: InitConverastionRequest, background_tasks: BackgroundTasks):
-    background_tasks.add_task(init_conversation_background, request)
-    return {"succes": True}
-    # return await init_conversation_background(request)
+    # background_tasks.add_task(init_conversation_background, request)
+    # return {"succes": True}
+    return await init_conversation_background(request)
 
 
 @router.post('/processConversation', status_code=200)
 async def process_conversation(request: UserMessageRequest, background_tasks: BackgroundTasks):
-    background_tasks.add_task(process_conversation_background, request)
-    return {"succes": True}
-    # return await process_conversation_background(request)
+    # background_tasks.add_task(process_conversation_background, request)
+    # return {"succes": True}
+    return await process_conversation_background(request)
 
 @router.get('/getProfile', status_code=200)
 async def get_profile(request: Profile):
@@ -179,7 +179,7 @@ async def ask(request: LLMRequest) -> Dict[str, Any]:
             ===============================================
             Предыдущие заказы клиента: {orders}
             ===============================================
-            Доступный ассортимент для заказа: {products}
+            Подходящие товары: 
             ===============================================
             {prompt_content}
             """

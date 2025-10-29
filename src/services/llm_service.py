@@ -1,5 +1,9 @@
 import os
+import asyncpg
 from src.config.settings import settings
+# from mirascope.retries.tenacity import collect_errors
+# from tenacity import retry, stop_after_attempt
+
 
 # Set environment variables before importing OpenAI and Mirascope
 os.environ["LANGFUSE_PUBLIC_KEY"] = settings.langfuse.langfuse_public_key
@@ -8,7 +12,13 @@ os.environ["LANGFUSE_HOST"] = settings.langfuse.langfuse_host
 os.environ["OPENAI_API_KEY"] = settings.openrouter.openrouter_api_key
 
 from openai import OpenAI
-from mirascope.core import openai, BaseMessageParam, BaseDynamicConfig, Messages, BaseTool
+from mirascope.core import (
+    openai,
+    BaseMessageParam,
+    BaseDynamicConfig,
+    Messages,
+    BaseTool,
+)
 from mirascope.integrations.langfuse import with_langfuse
 from supabase import create_client, Client, ClientOptions
 from typing import List, Optional, Dict, Any
@@ -17,23 +27,24 @@ import requests
 import json
 
 
+from src.services.history_service import HistoryService
+from src.utils import parse_sql_result, records_to_json
+
 supabase_client = create_client(
     settings.supabase.supabase_url,
     settings.supabase.supabase_service_key,
-    options=ClientOptions(schema='myaso')
-    )
+    options=ClientOptions(schema="myaso"),
+)
 
 
 class ShowProductPhotos(BaseTool):
     """Tool for showing photos of products."""
 
     product_names: List[str] = Field(
-        ...,
-        description="List of product names to search for photos"
+        ..., description="List of product names to search for photos"
     )
     phone_number: str = Field(
-        ...,
-        description="Phone number of the user requesting the photos"
+        ..., description="Phone number of the user requesting the photos"
     )
 
     def call(self) -> str:
@@ -45,25 +56,41 @@ class ShowProductPhotos(BaseTool):
         """
 
         print("Uploading photos from Supabase...")
-        print("product_names:", ', '.join(self.product_names))
+        print("product_names:", ", ".join(self.product_names))
         print("phone:", self.phone_number)
 
         for product_name in self.product_names:
-            response = (supabase_client.table('products').select(
-                '*').eq('title', product_name).execute()).data
+            response = (
+                supabase_client.table("products")
+                .select("*")
+                .eq("title", product_name)
+                .execute()
+            ).data
             print("response:", response)
 
             if len(response) == 0:
                 continue
 
-            if response[0].get('photo', None):
-                print("Есть фото: ", product_name, response[0].get('photo', None))
-                print({'recipient': self.phone_number, 'image_url': response[0].get('photo', None), 'caption': product_name})
-                requests.post(url='http://51.250.42.45:2026/sendImage', json={'recipient': self.phone_number, 'image_url': response[0].get('photo', None), 'caption': product_name})
+            if response[0].get("photo", None):
+                print("Есть фото: ", product_name, response[0].get("photo", None))
+                print(
+                    {
+                        "recipient": self.phone_number,
+                        "image_url": response[0].get("photo", None),
+                        "caption": product_name,
+                    }
+                )
+                requests.post(
+                    url="http://51.250.42.45:2026/sendImage",
+                    json={
+                        "recipient": self.phone_number,
+                        "image_url": response[0].get("photo", None),
+                        "caption": product_name,
+                    },
+                )
 
             else:
                 print("Нет фото: ", product_name)
-
 
         # For testing purposes, return a success message
         return "Фотографии успешно отправлены."
@@ -74,18 +101,22 @@ class LLMService:
         print(f"API Key loaded: {settings.openrouter.openrouter_api_key[:10]}...")
         print(f"Base URL: {settings.openrouter.base_url}")
         print(f"Model ID: {settings.openrouter.model_id}")
-        
+
         self.client: OpenAI = OpenAI(
-            api_key=settings.openrouter.openrouter_api_key, 
-            base_url=settings.openrouter.base_url
+            api_key=settings.openrouter.openrouter_api_key,
+            base_url=settings.openrouter.base_url,
         )
         # Initialize Supabase client
         self.supabase: Client = create_client(
-            settings.supabase.supabase_url,
-            settings.supabase.supabase_service_key
+            settings.supabase.supabase_url, settings.supabase.supabase_service_key
         )
 
-    async def infer(self, query: str, history: Optional[List[BaseMessageParam]] = None, session_id: Optional[str] = None):
+    async def infer(
+        self,
+        query: str,
+        history: Optional[List[BaseMessageParam]] = None,
+        session_id: Optional[str] = None,
+    ):
         if history is None:
             history = []
 
@@ -94,10 +125,7 @@ class LLMService:
             model=settings.openrouter.model_id,
             client=self.client,
             tools=[ShowProductPhotos],
-            call_params={
-                'reasoning_effort': 'medium',
-                'max_tokens': 1800*3
-            }
+            call_params={"reasoning_effort": "medium", "max_tokens": 1800 * 3},
         )
         def _call(messages: List[BaseMessageParam]):
             return messages
@@ -117,14 +145,15 @@ class LLMService:
         if response.tool:
             # Extract tool call information before execution
             tool_call_info = {
-                'name': response.tool.__class__.__name__,
-                'arguments': response.tool.model_dump()
+                "name": response.tool.__class__.__name__,
+                "arguments": response.tool.model_dump(),
             }
 
             # Execute the tool and get the result
             tool_result = response.tool.call()
             print(
-                f"Tool {response.tool.__class__.__name__} executed with result: {tool_result}")
+                f"Tool {response.tool.__class__.__name__} executed with result: {tool_result}"
+            )
 
             # Store tool information in the response for later access
             response._tool_call_info = tool_call_info
@@ -136,12 +165,16 @@ class LLMService:
             # Add the tool call and result to the conversation history
             # Add the assistant's tool call message
             messages.append(response.message_param)
-            messages.extend(response.tool_message_params(
-                tools_and_outputs))  # Add tool results
+            messages.extend(
+                response.tool_message_params(tools_and_outputs)
+            )  # Add tool results
 
             # Make a second call with the tool result
-            messages.append(Messages.User(
-                content="Фотографии товара успешно отправлены. Продолжи диалог"))
+            messages.append(
+                Messages.User(
+                    content="Фотографии товара успешно отправлены. Продолжи диалог"
+                )
+            )
             second_response = _call(messages)
 
             # Pass tool information to the second response
@@ -152,5 +185,183 @@ class LLMService:
 
         return response
 
+    async def get_sql_query(self, user_request: str, top_k_limit: int = None, client: dict = None):
+        
+        @with_langfuse()
+        @openai.call(
+            model=settings.openrouter.model_id,
+            client=self.client,
+            call_params={"reasoning_effort": "medium"},
+        )
+        def _call(messages: List[BaseMessageParam],
+        #  errors: list[ValidationError] | None = None
+        ):
+
+            return messages
+
+        # Prepare messages
+        messages: list[BaseMessageParam] = [
+            Messages.System(
+                content=f"""Given an input question, create a syntactically correct PostgreSQL query to
+run to help find the answer. Unless the user specifies in his question a
+specific number of examples they wish to obtain, always limit your query to
+at most {top_k_limit} results. You can order the results by a relevant column to
+return the most interesting examples in the database.
+
+
+{f'CLIENT INFO: {client}' if client is not None else ''}
+
+Guidelines:
+- ALWAYS USE SCHEMA "myaso" IN EACH QUERY. TABLES ARE NOT IN PUBLIC 
+- Only use tables, columns, and relationships defined in the schema.
+- Do not invent column or table names. If something is unclear, write a SQL comment.
+- Use JOINs where necessary to combine data across tables.
+- Use GROUP BY and aggregate functions when the question implies summarization.
+- Always use LIMIT in queries requesting a preview or top-N results.
+- Format queries cleanly with appropriate indentation.
+- Never write DELETE, INSERT, UPDATE, DROP, or DDL statements.
+- Prefer using table aliases (`c` for customers, `o` for orders) when dealing with multiple tables.
+- Never query for all the columns from a specific table, only ask for a the few relevant columns given the question.
+- ALWAYS PUT FINAL RESULT INSIDE ```sql <query> ``` block
+
+Pay attention to use only the column names that you can see in the schema
+description. Be careful to not query for columns that do not exist. Also,
+pay attention to which column is in which table.
+
+Only use the following tables:
+--------------------------------------------------------------------------------------------------
+
+Table clients:
+Description: stores information about clients, including their contact details and business details
+
+phone: type - text, required - true - Client's phone number
+name: type - text, required - true - Client's name
+created_at: type - timestampz, required - true, default - now() - Time when the client was added to the table
+mode: type - text, required - false, default - autopilot
+city: type - text, required - fasle - Client's city
+business_area: type - text, required - false - Client's bussines area 
+is_it_friend: type - boolean, required - false - Set true if the client is a friend
+org_name - type - text, required - false - Client's organization name
+UTC: type - int, required - false - Client's time zone in UTC format
+sep_turnover: type - int, required - false 
+oct_turnover: type - int, required - false
+
+Foreign key relations: None
+
+--------------------------------------------------------------------------------------------------
+
+Table orders:
+Description: The orders table tracks product orders placed by clients, linking each order to a client via phone number and storing key details such as product, quantity, pricing, and delivery destination.
+
+id: type - UUID, primary - true
+title: type - text, required - true - The ordered product's title
+phone: type - text, required - true - Client's phone number. This client ordered the product
+created_at: type - date, required - true - Order date
+weight_kg: type - int, required - true - Product weight in the order
+price_out: type - text, required - true - Order price
+destination: type - text, required - true - Order delivery destination
+price_out_kg: type - text, required - true - Product price (for one kilogram)
+
+Foreign key relation to: myaso.clients
+orders_phone_fkey: phone -> myaso.clients.phone
+
+--------------------------------------------------------------------------------------------------
+
+Table products:
+Description: The products table stores information about available products, including their origin, pricing, packaging, delivery details, and logistical attributes, to support order preparation and client inquiries.
+
+id: type - int, primary - true - ID product in database 
+title: type - text, required - false - Product's title
+from_region: type - text, required - false - Product's region of origin 
+photo: type - text, required - false - Product photo's link
+pricelist_date: type - date, required - false - Price at pricelist date
+supplier_name: type - text, required - false - Supplier name
+delivery_cost_MSK: type - float8, required - false - Delivery cost to Moscow for 1 kg of product
+package_weight: type - float8, required - false - Weight of one product package
+prepayment_1t: type - int8, required - false 
+order_price_kg: type - float8, required - false - Price of one kilogram of the product  
+min_order_weight_kg: type - int, required - false - Minimal allowed weight for order 
+discount: type - text, required - false - Discount
+ready_made: type - boolean, required - false - Is Ready-made food
+package_type: type - text, required - false - Package type for product (box, package, pallet, etc)
+cooled_or_frozen: type - text, required - false - Is this product cooled or frozen
+product_in_package: type - text, required - false
+
+Foreign key relations: None
+
+--------------------------------------------------------------------------------------------------
+
+Table price_history
+Description: The price_history table tracks historical pricing data for products, recording the price of each product by supplier over time.
+
+id: type - int8, primary - true
+product: type - text, required - true - Product's title
+date: type - date, required - true - Date
+price: type - float, required - true - Product's price at the specified date
+suplier_name: type - text, required - true - Supplier name
+
+Foreign key relations: None
+
+--------------------------------------------------------------------------------------------------
+
+"""
+            ),
+            Messages.User(
+                content="Translate the following user request into a SQL query: "
+                + user_request
+            ),
+        ]
+
+        # Make the initial call
+        response = _call(messages)
+        return response
+
+    
+    async def get_result_from_db_by_ai(self, user_request: str, top_k_limit: int = None, client: dict = None):
+        response = await self.get_sql_query(user_request, top_k_limit, client)
+
+        # Extract content from response
+        content = ""
+        try:
+
+            response_attr = getattr(response, 'response', None)
+            if response_attr is not None:
+
+                choices_attr = getattr(response_attr, 'choices', None)
+                if choices_attr is not None:
+                    content = choices_attr[0].message.content
+                else:
+                    content = str(response_attr)
+            else:
+                choices_attr = getattr(response, 'choices', None)
+                if choices_attr is not None:
+                    content = choices_attr[0].message.content
+                else:
+                    content = str(response)
+
+        except Exception as e:
+            content = f"Error extracting content: {str(e)}"
+    
+        sql_request = parse_sql_result(content)
+        if ('insert' in sql_request.lower() or 'update' in sql_request.lower() or 'delete' in sql_request.lower()):
+            raise ValueError("AI table modification attempt detected")
+
+        print(sql_request)
+
+        conn = await asyncpg.connect(dsn='postgres://postgres.your-tenant-id:N,$=~94SJRuWBU"h5kH;.2@51.250.35.208:5432/postgres')
+        result = await conn.fetch(sql_request)
+
+        print(result)
+       
+        # Преобразуем Record объекты в JSON-совместимые словари
+        json_result = records_to_json(result)
+    
+        print(json_result)
+        await conn.close()
+
+        return json_result
 
 llm = LLMService()
+
+
+    

@@ -240,3 +240,40 @@ def remove_markdown_symbols(text: str) -> str:
     text = text.strip()
     
     return text
+
+def parse_sql_result(response_text):
+    
+    if response_text.find("```sql") == -1:
+        raise ValueError("No SQL query found in the response [No ```sql block]")
+
+    sql_start = response_text.find("```sql")
+    response_text = response_text[sql_start+6:]
+    sql_end = response_text.rfind("```")
+    
+    
+    if sql_end != -1:
+        response_text = response_text[:sql_end].strip()
+
+    return response_text
+
+def records_to_json(records):
+    """
+    Преобразует список asyncpg Record объектов в JSON-совместимый список словарей.
+    
+    Args:
+        records: Список Record объектов из asyncpg
+        
+    Returns:
+        Список словарей, готовых для JSON сериализации
+    """
+    if not records:
+        return []
+    
+    json_result = []
+    for record in records:
+        # Преобразуем каждый Record в словарь
+        record_dict = dict(record)
+        json_result.append(record_dict)
+    
+    return json_result
+
