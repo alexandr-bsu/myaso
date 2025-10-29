@@ -70,13 +70,25 @@ async def init_conversation_background(request: InitConverastionRequest):
 async def process_conversation_background(request: UserMessageRequest):
     hs = await HistoryService()
 
+    # Обогащаем контекстом запрос пользователя
+    orders = OrderService()
+    products = await orders.find_products_by_query(request.message)
+
+    enhaced_prompt = f"""
+    =================================================
+    Подходящие под текущий вопрос/запрос товары:
+    {products}
+    =================================================
+
+    На основе этих товаров, ответь на сообщение: {request.message}
+    """
     try:
         # Get AI response first
-        ai_response = await ask(LLMRequest(client_phone=request.client_phone, prompt=request.message))
+        ai_response = await ask(LLMRequest(client_phone=request.client_phone, prompt=enhaced_prompt))
         print('ai_response process_conversation_background', request.message)
         
         # Add user message to history
-        await hs.add_message_to_conversation_history(ConversationHistoryMessage(client_phone=request.client_phone, message=request.message, role='user'))
+        await hs.add_message_to_conversation_history(ConversationHistoryMessage(client_phone=request.client_phone, message=enhaced_prompt, role='user'))
 
         # Add tool calls to history if present
         if ai_response.get('tool_calls'):

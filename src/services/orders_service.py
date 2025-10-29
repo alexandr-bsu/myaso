@@ -1,15 +1,22 @@
 import asyncio
+import asyncpg
+
 from src.config.settings import settings
 from supabase import acreate_client, AClient, AsyncClientOptions
 from typing import Optional
-from src.utils import AsyncMixin
-
+from src.utils import AsyncMixin, records_to_json
+from src.services.llm_service import LLMService
+from openai import OpenAI
 
 class OrderService(AsyncMixin):
     async def __ainit__(self):
         self.supabase: AClient = await acreate_client(
             settings.supabase.supabase_url, settings.supabase.supabase_service_key, options=AsyncClientOptions(schema='myaso'))
 
+        self.embedder: OpenAI = OpenAI(
+            api_key=settings.alibaba.alibaba_key,
+            base_url=settings.alibaba.base_alibaba_url
+        )
 
     async def get_all_products(self):
         result = await self.supabase.table('products').select('*').execute()
@@ -22,5 +29,29 @@ class OrderService(AsyncMixin):
     async def get_sys_variables(self):
         result = await self.supabase.table('system').select('*').execute()
         return result.data if len(result.data) else []
+
+    async def find_products_by_query(self, query: str):
+        print('find_products_by_query started')
+        llm_service = LLMService()
+        conn = await asyncpg.connect(
+                    dsn='postgres://postgres.your-tenant-id:N,$=~94SJRuWBU"h5kH;.2@51.250.35.208:5432/postgres'
+                )
+        embedder = llm_service.embedder
+        completion = embedder.embeddings.create(model="text-embedding-v4", input=query)
+        query_vector = completion.model_dump()['data'][0]['embedding']
+        sql_request = f"""
+        SELECT *
+        FROM myaso.products
+        ORDER BY embedding <-> '{query_vector}'
+        LIMIT 10;
+        """
+
+        result = await conn.fetch(sql_request)
+        json_result = records_to_json(result)
+
+        print(json_result)
+        for product in json_result:
+            del product['embedding']
+        return json_result if len(json_result) else []
 
 
