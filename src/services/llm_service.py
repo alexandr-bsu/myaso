@@ -97,6 +97,9 @@ class ShowProductPhotos(BaseTool):
         print("product_names:", ", ".join(self.product_names))
         print("phone:", self.phone_number)
 
+        has_photo = []
+        no_photo = []
+
         for product_name in self.product_names:
             response = (
                 supabase_client.table("products")
@@ -127,11 +130,17 @@ class ShowProductPhotos(BaseTool):
                     },
                 )
 
+                has_photo.append(product_name)
+
             else:
                 print("Нет фото: ", product_name)
+                no_photo.append(product_name)
 
         # For testing purposes, return a success message
-        return "Фотографии успешно отправлены."
+        return f"""
+        Фотографии товаров отправлены: {has_photo}.
+        Нет фотографий оваров: {no_photo}
+        """
 
 
 class LLMService:
@@ -292,7 +301,6 @@ Guidelines:
 - Format queries cleanly with appropriate indentation.
 - Never write DELETE, INSERT, UPDATE, DROP, or DDL statements.
 - Prefer using table aliases (`c` for customers, `o` for orders) when dealing with multiple tables.
-- Never query for all the columns from a specific table, only ask for a the few relevant columns given the question.
 - ALWAYS PUT FINAL RESULT INSIDE ```sql <query> ``` block
 
 Pay attention to use only the column names that you can see in the schema
@@ -356,6 +364,7 @@ ready_made: type - boolean, required - false - Is Ready-made food
 package_type: type - text, required - false - Package type for product (box, package, pallet, etc)
 cooled_or_frozen: type - text, required - false - Is this product cooled or frozen
 product_in_package: type - text, required - false
+embedding: type - vector, required - false - Embedding of product. Used in semantic search queries
 
 Foreign key relations: None
 
