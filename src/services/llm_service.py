@@ -2,7 +2,7 @@ import os
 import asyncpg
 from src.config.settings import settings
 from tenacity import retry, stop_after_attempt, RetryError
-
+from pydantic import BaseModel
 
 # Set environment variables before importing OpenAI and Mirascope
 os.environ["LANGFUSE_PUBLIC_KEY"] = settings.langfuse.langfuse_public_key
@@ -74,12 +74,15 @@ supabase_client = create_client(
     options=ClientOptions(schema="myaso"),
 )
 
+class Product(BaseModel):
+    title: str = Field(..., description="Title of the product")
+    supplier_name:str = Field(..., description="Supplier name of the product")
 
 class ShowProductPhotos(BaseTool):
     """Tool for showing photos of products."""
 
-    product_names: List[str] = Field(
-        ..., description="List of product names to search for photos"
+    products: List[Product] = Field(
+        ..., description="List of products to search for photos"
     )
     phone_number: str = Field(
         ..., description="Phone number of the user requesting the photos"
@@ -94,17 +97,18 @@ class ShowProductPhotos(BaseTool):
         """
 
         print("Uploading photos from Supabase...")
-        print("product_names:", ", ".join(self.product_names))
+        print("products:", self.products)
         print("phone:", self.phone_number)
 
         has_photo = []
         no_photo = []
 
-        for product_name in self.product_names:
+        for product in self.products:
             response = (
                 supabase_client.table("products")
                 .select("*")
-                .eq("title", product_name)
+                .eq("title", product.title)
+                .eq("supplier_name", product.supplier_name)
                 .execute()
             ).data
             print("response:", response)
@@ -113,12 +117,12 @@ class ShowProductPhotos(BaseTool):
                 continue
 
             if response[0].get("photo", None):
-                print("Есть фото: ", product_name, response[0].get("photo", None))
+                print("Есть фото: ", product.title, response[0].get("photo", None))
                 print(
                     {
                         "recipient": self.phone_number,
                         "image_url": response[0].get("photo", None),
-                        "caption": product_name,
+                        "caption": product.title,
                     }
                 )
                 requests.post(
@@ -126,15 +130,15 @@ class ShowProductPhotos(BaseTool):
                     json={
                         "recipient": self.phone_number,
                         "image_url": response[0].get("photo", None),
-                        "caption": product_name,
+                        "caption": product.title,
                     },
                 )
 
-                has_photo.append(product_name)
+                has_photo.append(product.title)
 
             else:
-                print("Нет фото: ", product_name)
-                no_photo.append(product_name)
+                print("Нет фото: ", product.title)
+                no_photo.append(product.title)
 
         # For testing purposes, return a success message
         return f"""
