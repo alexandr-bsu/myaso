@@ -14,7 +14,7 @@ services:
       - BASE_ALIBABA_URL=${BASE_ALIBABA_URL}
       - ALIBABA_KEY=${ALIBABA_KEY}
       - EMBEDDING_MODEL_ID=${EMBEDDING_MODEL_ID}
-      - BASE_URL=${BASE_URL:-https://openrouter.ai/api/v1}
+      - BASE_URL=${BASE_URL:-https://dashscope-intl.aliyuncs.com/compatible-mode/v1}
       - MODEL_ID=${MODEL_ID}
       - LANGFUSE_PUBLIC_KEY=${LANGFUSE_PUBLIC_KEY}
       - LANGFUSE_SECRET_KEY=${LANGFUSE_SECRET_KEY}

@@ -17,8 +17,8 @@ class SupabaseSettings(BaseSettings):
 
 
 class OpenRouterSettings(BaseSettings):
-    # base_url: str = "https://dashscope-intl.aliyuncs.com/compatible-mode/v1"
-    base_url: str = "https://openrouter.ai/api/v1"
+    base_url: str = "https://dashscope-intl.aliyuncs.com/compatible-mode/v1"
+    # base_url: str = "https://openrouter.ai/api/v1"
     openrouter_api_key: str
     model_id: str
     model_config = SettingsConfigDict(

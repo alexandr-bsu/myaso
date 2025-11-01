@@ -236,11 +236,11 @@ class LLMService:
             )  # Add tool results
 
             # Make a second call with the tool result
-            messages.append(
-                Messages.User(
-                    content="Фотографии товара успешно отправлены. Продолжи диалог"
-                )
-            )
+            # messages.append(
+            #     Messages.User(
+            #         content="Фотографии товара успешно отправлены. Продолжи диалог"
+            #     )
+            # )
             second_response = _call(messages)
 
             # Pass tool information to the second response
