@@ -91,7 +91,7 @@ async def init_conversation_background(request: InitConverastionRequest):
         #         "message": remove_markdown_symbols(ai_response["content"]),
         #     },
         # )
-        return {'content': remove_markdown_symbols(ai_response['content'])}
+        return {"content": remove_markdown_symbols(ai_response["content"])}
         # return {"succes": True}
 
     except Exception as e:
@@ -107,7 +107,9 @@ async def init_conversation_background(request: InitConverastionRequest):
 
         traceback.print_exc()
         # return {"succes": False}
-        return {'content': 'Произошла ошибка при обработке вашего сообщения. Попробуйте позже.'}
+        return {
+            "content": "Произошла ошибка при обработке вашего сообщения. Попробуйте позже."
+        }
 
 
 async def process_conversation_background(request: UserMessageRequest):
@@ -186,7 +188,7 @@ async def process_conversation_background(request: UserMessageRequest):
         #     },
         # )
         # return {"succes": True}
-        return {'content': remove_markdown_symbols(ai_response['content'])}
+        return {"content": remove_markdown_symbols(ai_response["content"])}
 
     except Exception as e:
         # requests.post(
@@ -201,7 +203,9 @@ async def process_conversation_background(request: UserMessageRequest):
 
         traceback.print_exc()
         # return {"succes": False}
-        return {'content': 'Произошла ошибка при обработке вашего сообщения. Попробуйте позже.'}
+        return {
+            "content": "Произошла ошибка при обработке вашего сообщения. Попробуйте позже."
+        }
 
 
 # TODO: Сделать сброс истории и инициализировать новый диалог (ktopравить сообщение клиенту)
@@ -279,7 +283,7 @@ async def ask(request: LLMRequest) -> Dict[str, Any]:
                 ).get("prompt", ""),
                 top_k_limit=10,
                 client=profile,
-                system_vars=sys_variables
+                system_vars=sys_variables,
             )
 
             # Handle the case where system_instructions might not be a dict
@@ -316,23 +320,41 @@ async def ask(request: LLMRequest) -> Dict[str, Any]:
     # Handle both direct response and response with tool calls
     content = ""
     try:
-        # Use getattr with default values to safely access attributes
-        response_attr = getattr(response, "response", None)
-        if response_attr is not None:
-            # Response from second call after tool execution
-            choices_attr = getattr(response_attr, "choices", None)
-            if choices_attr is not None:
-                content = choices_attr[0].message.content
+        # Check if this is a tool call response - use the tool result as content
+        tool_result = getattr(response, "_tool_result", None)
+        if tool_result is not None:
+            # For tool calls, use the original LLM content + tool result
+            response_attr = getattr(response, "response", None)
+            if response_attr is not None:
+                choices_attr = getattr(response_attr, "choices", None)
+                if choices_attr is not None:
+                    llm_content = choices_attr[0].message.content
+                else:
+                    llm_content = ""
             else:
-                content = str(response_attr)
+                choices_attr = getattr(response, "choices", None)
+                if choices_attr is not None:
+                    llm_content = choices_attr[0].message.content
+                else:
+                    llm_content = ""
+
+            # Combine LLM content with tool result
+            content = llm_content if llm_content else str(tool_result)
         else:
-            choices_attr = getattr(response, "choices", None)
-            if choices_attr is not None:
-                # Direct OpenAI response
-                content = choices_attr[0].message.content
+            # Regular response without tool calls
+            response_attr = getattr(response, "response", None)
+            if response_attr is not None:
+                choices_attr = getattr(response_attr, "choices", None)
+                if choices_attr is not None:
+                    content = choices_attr[0].message.content
+                else:
+                    content = str(response_attr)
             else:
-                # Fallback - convert to string
-                content = str(response)
+                choices_attr = getattr(response, "choices", None)
+                if choices_attr is not None:
+                    content = choices_attr[0].message.content
+                else:
+                    content = str(response)
     except Exception as e:
         content = f"Error extracting content: {str(e)}"
 

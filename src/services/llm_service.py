@@ -225,29 +225,8 @@ class LLMService:
             response._tool_call_info = tool_call_info
             response._tool_result = tool_result
 
-            # Collect tools and outputs for tool_message_params
-            tools_and_outputs = [(response.tool, tool_result)]
-
-            # Add the tool call and result to the conversation history
-            # Add the assistant's tool call message
-            messages.append(response.message_param)
-            messages.extend(
-                response.tool_message_params(tools_and_outputs)
-            )  # Add tool results
-
-            # Make a second call with the tool result
-            # messages.append(
-            #     Messages.User(
-            #         content="Фотографии товара успешно отправлены. Продолжи диалог"
-            #     )
-            # )
-            second_response = _call(messages)
-
-            # Pass tool information to the second response
-            second_response._tool_call_info = tool_call_info
-            second_response._tool_result = tool_result
-
-            return second_response
+            # Return the original response with tool result instead of making another LLM call
+            return response
 
         return response
 
