@@ -73,3 +73,23 @@ class OrderService(AsyncMixin):
         for product in json_result:
             del product["embedding"]
         return json_result if len(json_result) else []
+
+    async def get_random_products(self, limit: int = 10):
+        conn = await asyncpg.connect(
+            dsn='postgres://postgres.your-tenant-id:N,$=~94SJRuWBU"h5kH;.2@51.250.35.208:5432/postgres'
+        )
+
+        sql_request = f"""
+        SELECT *
+FROM myaso.products
+ORDER BY RANDOM()
+LIMIT {limit};
+        """
+
+        result = await conn.fetch(sql_request)
+        json_result = records_to_json(result)
+
+        print(json_result)
+        for product in json_result:
+            del product["embedding"]
+        return json_result if len(json_result) else []
