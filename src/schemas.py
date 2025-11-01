@@ -39,9 +39,16 @@ class LLMRequest(BaseModel):
     def validate_prompt_json(cls, v):
         if isinstance(v, str):
             try:
-                return json.dumps(json.loads(v))
+                # Try to parse as JSON first
+                parsed = json.loads(v)
+                # If it's a string inside JSON, return it as is without re-encoding
+                if isinstance(parsed, str):
+                    return parsed
+                # Otherwise, serialize with ensure_ascii=False to preserve Unicode
+                return json.dumps(parsed, ensure_ascii=False)
             except (json.JSONDecodeError, TypeError):
-                return json.dumps(v)
+                # If it's not valid JSON, return the string as is
+                return v
         return v
 
 

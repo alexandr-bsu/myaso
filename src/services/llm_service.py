@@ -306,8 +306,11 @@ class LLMService:
                 print(f"Error extracting message content: {e}")
                 message_content = ""
 
-            if response.tool.__class__.__name__ == 'EnhanceUserProductQuery':
+            if response.tool.__class__.__name__ == "EnhanceUserProductQuery":
                 print("Called EnhanceUserProductQuery, making second LLM call...")
+                print(f"Original query: {query}")
+                print(f"Query type: {type(query)}")
+                print(f"Query repr: {repr(query)}")
 
                 # Collect tools and outputs for tool_message_params
                 tools_and_outputs = [(response.tool, tool_result)]
@@ -317,10 +320,15 @@ class LLMService:
                 messages.extend(response.tool_message_params(tools_and_outputs))
 
                 # Add user message to continue the conversation
-                messages.append(
-                    Messages.User(content=f"На основе подобранных товаров, ответь на мой вопрос: {query}")
+                # Ensure query is properly encoded as UTF-8 string
+                query_text = str(query).encode("utf-8").decode("utf-8") if query else ""
+                final_message = (
+                    f"На основе подобранных товаров, ответь на мой вопрос: {query_text}"
                 )
+                print(f"Final message to LLM: {final_message}")
+                print(f"Final message repr: {repr(final_message)}")
 
+                messages.append(Messages.User(content=final_message))
 
                 # Make a second call with the tool result
                 second_response = _call(messages)
@@ -330,7 +338,6 @@ class LLMService:
                 second_response._tool_result = tool_result
 
                 return second_response
-
 
             # make second call if message content is empty
             if not message_content.strip():
@@ -344,15 +351,13 @@ class LLMService:
                 messages.extend(response.tool_message_params(tools_and_outputs))
 
                 # Add user message to continue the conversation
-                if(response.tool.__class__.__name__ == 'ShowProductPhotos'):
+                if response.tool.__class__.__name__ == "ShowProductPhotos":
                     messages.append(
                         Messages.User(content="Фотографии отправлены. Продолжай")
                     )
 
                 else:
-                    messages.append(
-                        Messages.User(content=tool_result)
-                    )
+                    messages.append(Messages.User(content=tool_result))
 
                 # Make a second call with the tool result
                 second_response = _call(messages)

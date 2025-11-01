@@ -303,7 +303,12 @@ async def ask(request: LLMRequest) -> Dict[str, Any]:
     # Call LLM
     # Note: The LLM service will automatically add the query as a user message,
     # so we don't need to add it to message_history ourselves
-    response = await llm.infer(query=request.prompt or "", history=message_history)
+    query_to_send = request.prompt or ""
+    print(f"Router - Original prompt: {query_to_send}")
+    print(f"Router - Prompt type: {type(query_to_send)}")
+    print(f"Router - Prompt repr: {repr(query_to_send)}")
+    
+    response = await llm.infer(query=query_to_send, history=message_history)
 
     # Extract content from response
     # Handle both direct response and response with tool calls
