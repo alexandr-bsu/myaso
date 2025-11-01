@@ -142,8 +142,8 @@ class ShowProductPhotos(BaseTool):
 
         # For testing purposes, return a success message
         return f"""
-        Фотографии товаров отправлены: {has_photo}.
-        Нет фотографий оваров: {no_photo}
+        Фотографии следующих товаров отправлены: {has_photo}.
+        Нет фотографий следующих товаров: {no_photo}
         """
 
 
@@ -253,7 +253,7 @@ class LLMService:
                 messages.extend(response.tool_message_params(tools_and_outputs))
                 
                 # Add user message to continue the conversation
-                messages.append(Messages.User(content="Фотографии получены, продолжай"))
+                messages.append(Messages.User(content=f'Сообщи о том, что {tool_result}'))
                 
                 # Make a second call with the tool result
                 second_response = _call(messages)
