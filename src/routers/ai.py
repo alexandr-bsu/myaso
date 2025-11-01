@@ -99,7 +99,7 @@ async def init_conversation_background(request: InitConverastionRequest):
             "http://51.250.42.45:2026/send-message",
             json={
                 "recipient": request.client_phone,
-                "message": "Произошла ошибка при обработке вашего сообщения. Попробуйте позже.",
+                "message": "Что-то барахлит вотсап 😞. Пожалуйста, отправьте сообщение ещё раз",
             },
         )
         print(f"ERROR in init_conversation_background: {e}")
@@ -184,7 +184,7 @@ async def process_conversation_background(request: UserMessageRequest):
             "http://51.250.42.45:2026/send-message",
             json={
                 "recipient": request.client_phone,
-                "message": "Произошла ошибка при обработке вашего сообщения. Попробуйте позже.",
+                "message": "Что-то барахлит вотсап 😞. Пожалуйста, отправьте сообщение ещё раз",
             },
         )
         print(f"ERROR in process_conversation_background: {e}")
