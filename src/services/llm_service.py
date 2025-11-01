@@ -225,8 +225,47 @@ class LLMService:
             response._tool_call_info = tool_call_info
             response._tool_result = tool_result
 
-            # Return the original response with tool result instead of making another LLM call
-            return response
+            # Check if message.content is empty - only then make a second LLM call
+            message_content = ""
+            try:
+                response_attr = getattr(response, "response", None)
+                if response_attr is not None:
+                    choices_attr = getattr(response_attr, "choices", None)
+                    if choices_attr is not None:
+                        message_content = choices_attr[0].message.content or ""
+                else:
+                    choices_attr = getattr(response, "choices", None)
+                    if choices_attr is not None:
+                        message_content = choices_attr[0].message.content or ""
+            except Exception as e:
+                print(f"Error extracting message content: {e}")
+                message_content = ""
+
+            # Only make second call if message content is empty
+            if not message_content.strip():
+                print("Message content is empty, making second LLM call...")
+                
+                # Collect tools and outputs for tool_message_params
+                tools_and_outputs = [(response.tool, tool_result)]
+
+                # Add the tool call and result to the conversation history
+                messages.append(response.message_param)
+                messages.extend(response.tool_message_params(tools_and_outputs))
+                
+                # Add user message to continue the conversation
+                messages.append(Messages.User(content="Фотографии получены, продолжай"))
+                
+                # Make a second call with the tool result
+                second_response = _call(messages)
+
+                # Pass tool information to the second response
+                second_response._tool_call_info = tool_call_info
+                second_response._tool_result = tool_result
+
+                return second_response
+            else:
+                print("Message content is not empty, returning original response")
+                return response
 
         return response
 
