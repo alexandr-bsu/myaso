@@ -275,7 +275,7 @@ async def ask(request: LLMRequest) -> Dict[str, Any]:
                 system_vars=sys_variables,
             )
 
-            if products is None:
+            if len(products) == 0:
                 products = await order_service.get_random_products(limit=10)
 
             # Handle the case where system_instructions might not be a dict

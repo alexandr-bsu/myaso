@@ -409,9 +409,11 @@ specific number of examples they wish to obtain, always limit your query to
 at most {top_k_limit} results. You can order the results by a relevant column to
 return the most interesting examples in the database.
 
-
+==========================================================================================================
 {f'CLIENT INFO: {client}' if client is not None else ''}
+==========================================================================================================
 {f'SYSTEM VARIABLES: {system_vars if system_vars else "No system variables available"}' if system_vars is not None else ''}
+==========================================================================================================
 
 Guidelines:
 - ALWAYS USE SCHEMA "myaso" IN EACH QUERY. TABLES ARE NOT IN PUBLIC 
@@ -424,6 +426,7 @@ Guidelines:
 - Never write DELETE, INSERT, UPDATE, DROP, or DDL statements.
 - Prefer using table aliases (`c` for customers, `o` for orders) when dealing with multiple tables.
 - ALWAYS PUT FINAL RESULT INSIDE ```sql <query> ``` block
+- Use client data and system variables from context (hardcoded), NOT TABLE
 
 Pay attention to use only the column names that you can see in the schema
 description. Be careful to not query for columns that do not exist. Also,
