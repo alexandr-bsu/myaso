@@ -114,19 +114,8 @@ async def init_conversation_background(request: InitConverastionRequest):
 
 async def process_conversation_background(request: UserMessageRequest):
     hs = await HistoryService()
-
-    # Обогащаем контекстом запрос пользователя
-    orders = await OrderService()
-    products = await orders.find_products_by_query(request.message)
-
-    enhaced_prompt = f"""
-    =================================================
-    Подходящие под текущий вопрос/запрос товары:
-    {products}
-    =================================================
-
-    На основе этих товаров, ответь на сообщение: {request.message}
-    """
+    enhaced_prompt = request.message
+    
     try:
         # Get AI response first
         ai_response = await ask(

@@ -1,4 +1,6 @@
 import os
+import asyncio
+import inspect
 import asyncpg
 from src.config.settings import settings
 from tenacity import retry, stop_after_attempt, RetryError
@@ -27,6 +29,8 @@ import json
 
 
 from src.services.history_service import HistoryService
+from src.services.orders_service import OrderService
+
 from src.utils import parse_sql_result, records_to_json
 
 
@@ -74,9 +78,11 @@ supabase_client = create_client(
     options=ClientOptions(schema="myaso"),
 )
 
+
 class Product(BaseModel):
     title: str = Field(..., description="Title of the product")
-    supplier_name:str = Field(..., description="Supplier name of the product")
+    supplier_name: str = Field(..., description="Supplier name of the product")
+
 
 class ShowProductPhotos(BaseTool):
     """Tool for showing photos of products."""
@@ -147,6 +153,59 @@ class ShowProductPhotos(BaseTool):
         """
 
 
+class EnhanceUserProductQuery(BaseTool):
+    """Enhance user request by searching products in database with ebedding"""
+
+    request: str = Field(..., description="user request about market assortiment")
+
+    async def call(self) -> str:
+        """
+                Use this tool only if there is an explicit intention to find products in the current query or in connection with the immediate context, expressed through:
+
+        ✅ Call the tool if:
+
+        The query contains at least one search attribute.:
+        • Type of meat (beef, pork, lamb, etc.)
+        • Part of the carcass (tenderloin, shoulder, ribs)
+        • Format (steak, minced meat, bones, chopped)
+        • Weight, packaging, cooking method
+        OR the request explicitly asks to show the assortment:
+        • "What do you have?"
+        • "Show all the meat"
+        • "What steaks do you have?"
+        OR the user asks for a recommendation with criteria:
+        • "What do you recommend for grilling?" → there is a criterion "for grilling"
+        • "What is suitable for soup?" → "for soup" criterion
+
+        ❌ Do not call the tool if:
+        Confirmation request/Rejection/response: "Yes", "No", "Ok", "Thank you"
+        Service topics are discussed: delivery, payment, refund, work schedule
+        The user clarifies the details of the already identified product:
+        • "Does this steak have a photo?"
+        • "How much does it weigh?"
+        The query does not contain search attributes and does not ask for a general overview:
+        • "Do you have good meat?"
+        • "Do you recommend something?" (without specifying the purpose/criteria)
+        The request consists only of polite or official words.: "Please", "May I?", "Hi"
+
+        ⚠️ Critically important:
+
+        Do not modify or enrich the user's request (for example, do not turn "Yes" into "Show products")
+        Do not launch a search if the product is already known from the context — the tool is intended only for searching for new products.
+        If in doubt, do not call the tool. It's better to skip than to trigger a false alarm.
+        """
+
+        print("Start to embedding user request: ", self.request)
+        # Обогащаем контекстом запрос пользователя
+
+        orders = await OrderService()
+        products = await orders.find_products_by_query(self.request)
+
+        print("products:", products)
+
+        return f"""{products}"""
+
+
 class LLMService:
     def __init__(self):
         print(f"API Key loaded: {settings.openrouter.openrouter_api_key[:10]}...")
@@ -190,7 +249,7 @@ class LLMService:
         @openai.call(
             model=settings.openrouter.model_id,
             client=self.client,
-            tools=[ShowProductPhotos],
+            tools=[ShowProductPhotos, EnhanceUserProductQuery],
             call_params={"reasoning_effort": "medium"},
         )
         def _call(messages: List[BaseMessageParam]):
@@ -216,7 +275,13 @@ class LLMService:
             }
 
             # Execute the tool and get the result
-            tool_result = response.tool.call()
+            # Check if call method is async
+            call_method = response.tool.call()
+            if inspect.iscoroutine(call_method):
+                tool_result = await call_method
+            else:
+                tool_result = call_method
+
             print(
                 f"Tool {response.tool.__class__.__name__} executed with result: {tool_result}"
             )
@@ -241,20 +306,54 @@ class LLMService:
                 print(f"Error extracting message content: {e}")
                 message_content = ""
 
-            # Only make second call if message content is empty
-            if not message_content.strip():
-                print("Message content is empty, making second LLM call...")
-                
+            if response.tool.__class__.__name__ == 'EnhanceUserProductQuery':
+                print("Called EnhanceUserProductQuery, making second LLM call...")
+
                 # Collect tools and outputs for tool_message_params
                 tools_and_outputs = [(response.tool, tool_result)]
 
                 # Add the tool call and result to the conversation history
                 messages.append(response.message_param)
                 messages.extend(response.tool_message_params(tools_and_outputs))
-                
+
                 # Add user message to continue the conversation
-                messages.append(Messages.User(content=f'Сообщи о том, что {tool_result}'))
-                
+                messages.append(
+                    Messages.User(content=f"На основе подобранных товаров, ответь на мой вопрос: {query}")
+                )
+
+
+                # Make a second call with the tool result
+                second_response = _call(messages)
+
+                # Pass tool information to the second response
+                second_response._tool_call_info = tool_call_info
+                second_response._tool_result = tool_result
+
+                return second_response
+
+
+            # make second call if message content is empty
+            if not message_content.strip():
+                print("Message content is empty, making second LLM call...")
+
+                # Collect tools and outputs for tool_message_params
+                tools_and_outputs = [(response.tool, tool_result)]
+
+                # Add the tool call and result to the conversation history
+                messages.append(response.message_param)
+                messages.extend(response.tool_message_params(tools_and_outputs))
+
+                # Add user message to continue the conversation
+                if(response.tool.__class__.__name__ == 'ShowProductPhotos'):
+                    messages.append(
+                        Messages.User(content="Фотографии отправлены. Продолжай")
+                    )
+
+                else:
+                    messages.append(
+                        Messages.User(content=tool_result)
+                    )
+
                 # Make a second call with the tool result
                 second_response = _call(messages)
 
