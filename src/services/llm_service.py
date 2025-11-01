@@ -222,10 +222,6 @@ class LLMService:
         )
         print(f"LLMService - Alibaba Base URL: {settings.alibaba.base_alibaba_url}")
 
-        # Temporarily disable validation to allow startup
-        # if not settings.alibaba.alibaba_key or not settings.alibaba.base_alibaba_url:
-        #     raise ValueError(f"Alibaba settings are not properly configured. API Key: {'SET' if settings.alibaba.alibaba_key else 'EMPTY'}, Base URL: {settings.alibaba.base_alibaba_url}")
-
         self.embedder: OpenAI = OpenAI(
             api_key=settings.alibaba.alibaba_key,
             base_url=settings.alibaba.base_alibaba_url,
